@@ -1,0 +1,32 @@
+item,part_number,qty,unit_usd,total_usd,link,notes,required
+SO-101 leader+follower parts (print excluded),SO-101,1,229.88,229.88,https://github.com/TheRobotStudio/SO-ARM100,Official self-sourced BOM; follower only 121.94; leader doubles as Stage 2 puppet,required
+Donor head: Master Airbrush G22 (0.3 mm gravity dual-action NEO-style clone) - 1 to strip + 1 spare/donor parts,MAS G22,2,29.99,59.98,https://tcpglobal.com/products/mas-g22,Alt: $24.99 incl. 6 ft hose at https://usartsupply.com/products/mas-g22-h ; weight not published - weigh on arrival; 1/8 BSP air inlet (verify),required
+Adafruit VL53L4CX ToF (STEMMA QT),5425,2,14.95,29.90,https://www.adafruit.com/product/5425,1 mounted + 1 spare,required
+RP2040 board w/ STEMMA QT (QT Py/Feather),check,1,check,check,https://www.adafruit.com/,ToF + valve MOSFET over USB serial,required
+STEMMA QT cables 200-300 mm,check,2,check,check,https://www.adafruit.com/,,required
+SMC VX210 2-port NC solenoid valve for air 1/8 (12VDC coil option),VX210AA (+12VDC coil option),1,22.00,22.00,https://www.smcpneumatics.com/VX210AA.html,220 g -> mount at arm BASE not wrist; confirm coil/thread code at order,required
+Alt valve: Airtac 2V025-06 12VDC NC 1/8 NPT,2V02506FIT,1,34.74,34.74,https://trimantec.com/products/airtac-2v025-solenoid-fluid-control-valve-22-way-2v02506fit,Alternative to SMC (not counted in total),optional
+SMC TU0604 PU tubing 6x4 mm 20 m blue,TU0604BU-20,1,20.99,20.99,https://www.datasheets.com/smc/tu0604bu-20,Compressor->regulator->valve->wrist; 4 mm OD (TU0425) lighter for last arm run - check,required
+SMC KQ2 male connector 6 mm x R1/8,KQ2H06-01AS,4,3.11,12.44,https://www.wurthbaermachinery.com/SMC-Pneumatic.html,Valve in/out + regulator out + head inlet adapter,required
+SMC KQ2 male elbow 6 mm x G1/8,KQ2L06-G01A,2,3.34,6.68,https://www.wurthbaermachinery.com/SMC-Pneumatic.html,Tight bends at valve/head,required
+Airbrush hose adapter 1/8 BSP female -> 6 mm push-in (or NEO hose thread adapter),check,1,check,check,check,Iwata NEO uses 1/8 BSP airbrush thread; Caliper/verify,required
+SMC filter-regulator w/ gauge 1/8,AW20-F01E-B,1,58.14,58.14,https://www.wurthbaermachinery.com/SMC-Pneumatic.html,Only if your compressor lacks a regulator+moisture trap,optional
+1/4 industrial quick-disconnect coupler+plug,check,1,check,check,check,Compressor side,required
+Tubing clips/spiral wrap + overhead spring boom (or retractable tool balancer),check,1,check,check,check,Support tubing+cables from above,required
+12V PSU + logic MOSFET/relay module for valve,check,1,check,check,check,,required
+Latching mushroom e-stop (NC) + contactor/safety relay,check,1,check,check,check,Cuts servo bus power AND valve power (NC valve -> air off),required
+USB 1080p UVC webcam fixed on canvas (C920 class),check,1,check,check,check,LeRobot OpenCV camera,required
+Mini USB UVC wrist camera,check,1,check,check,check,,optional
+Extra STS3215 7.4V (spare/needle servo if gripper repurposed differently),C001,1,13.89,13.89,https://github.com/TheRobotStudio/SO-ARM100,,optional
+Luxonis OAK-D Lite RGB-D,OAK-D Lite,1,269.00,269.00,https://shop.luxonis.com/products/oak-d-lite-1,Later; min depth 6.5 cm,optional
+STAGE 2 sleeve electronics: hall/pot on airbrush lever + air button (airbrush sleeve) / FSR or microswitch under spray-can cap (graffiti sleeve) + RP2040 + battery,check,1,check,check,check,Quest gives 6D pose; sleeve logs trigger values; ToF optional on sleeve,optional
+Stage 2 backup: webcam for AprilTag cross-check,check,1,check,check,check,,optional
+STAGE 2 mocap later: VIVE Tracker 3.0,VIVE Tracker 3.0,2,149.00,298.00,https://myshop-us.vive.com/vive_us/2104218.html,Optional only - Quest 3 owned and used instead; needs base stations (check),optional
+Overspray sleeves/plastic/masking,check,1,check,check,check,,required
+Respirator P100+OV + gloves,check,1,check,check,check,,required
+Filament PETG/PLA+,check,1,check,check,check,Likely on hand,required
+Meta Quest 3 + controllers,owned,1,0,0,,Stage 2 capture,required
+Spray cans + test paper/cardboard for Risk Rock session,check,1,check,check,,Risk Rock likely brings cans,optional
+"Later: spray-can actuator end-effector (servo cap presser, printed; ref Third Hand Spraycan-Actuator)",check,1,check,check,https://github.com/third-hand-research/spraycan-actuator,400 ml can ~400+ g full - exceeds SO-101 payload; small 150 ml cans or bigger arm,optional
+TOTAL priced required,,,,381.87,,plus 'check' items,
+TOTAL priced required+optional (excl. alt valve),,,,1020.90,,plus 'check' items,
