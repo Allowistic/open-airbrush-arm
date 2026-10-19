@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open Airbrush Arm: simulator</title>
+<style>
+  :root { --bg:#f6f6f4; --panel:#fff; --ink:#1d1f21; --mute:#6b6f76; --line:#d9d9d4; --ok:#2e9e48; --warn:#c98a12; --bad:#c9372c; --paint:#2456c9; --head:#e07a1f; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:10px 16px; border-bottom:1px solid var(--line); background:var(--panel); display:flex; flex-wrap:wrap; gap:8px 16px; align-items:baseline; }
+  header h1 { font-size:17px; margin:0; }
+  header .note { color:var(--mute); font-size:12.5px; }
+  .wrap { display:grid; grid-template-columns: 270px 1fr 1fr; gap:12px; padding:12px; }
+  @media (max-width: 1100px) { .wrap { grid-template-columns: 1fr 1fr; } #controls { grid-column: 1 / -1; } }
+  @media (max-width: 720px) { .wrap { grid-template-columns: 1fr; } }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .card h2 { font-size:13px; margin:0 0 8px; text-transform:uppercase; letter-spacing:.04em; color:var(--mute); }
+  label { display:grid; grid-template-columns: 1fr 86px; align-items:center; gap:6px; margin:5px 0; font-size:13px; }
+  label small { color:var(--mute); display:block; font-size:11px; }
+  input[type=number], select { width:100%; padding:4px 6px; border:1px solid var(--line); border-radius:5px; font:inherit; }
+  input[type=range] { width:100%; }
+  button { font:inherit; padding:5px 10px; border:1px solid #b9bcc2; border-radius:6px; background:#fff; cursor:pointer; }
+  button.primary { background:#1d1f21; color:#fff; border-color:#1d1f21; }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  canvas { width:100%; display:block; border-radius:6px; background:#fbfbfa; touch-action:none; }
+  #view3d { height:440px; cursor:grab; }
+  #view2d { height:440px; }
+  #chart { height:170px; }
+  .span2 { grid-column: span 2; }
+  @media (max-width: 1100px) { .span2 { grid-column: 1 / -1; } }
+  .legend { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:12px; color:var(--mute); margin-top:6px; }
+  .sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+  #warnings div { padding:6px 8px; border-left:3px solid var(--warn); background:#fff8e8; margin:4px 0; border-radius:3px; }
+  #warnings .good { border-color:var(--ok); background:#eef8f0; }
+  table { border-collapse:collapse; width:100%; font-size:12.5px; }
+  td, th { text-align:left; padding:3px 6px; border-bottom:1px solid #eee; vertical-align:top; }
+  th { color:var(--mute); font-weight:600; }
+  .tag { font-size:11px; padding:1px 6px; border-radius:9px; background:#eee; white-space:nowrap; }
+  .tag.source { background:#e5f2e8; } .tag.assumption { background:#fdf0d9; } .tag.limitation, .tag.open { background:#f9e1df; }
+  #status { color:var(--mute); font-size:12.5px; }
+  #readout td:first-child { color:var(--mute); width:46%; }
+  .mono { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<!--SIM_DATA-->
+<header>
+  <h1>Open Airbrush Arm simulator</h1>
+  <span class="note">SO-101 kinematics from the upstream URDF. Spray is an idealised cone, not calibrated paint physics. Nothing here is validated on hardware.</span>
+</header>
+<div class="wrap">
+  <section class="card" id="controls">
+    <h2>Path</h2>
+    <div id="staticNote" style="display:none;color:var(--mute);font-size:12.5px;margin-bottom:6px">Saved run (playback only). Run <code>python3 -m airbrush_sim serve</code> to change settings.</div>
+    <label>Shape <select id="shape"><option value="circle">Circle</option><option value="square">Square</option><option value="triangle">Triangle</option><option value="line">Line</option><option value="standoff_ladder">Standoff ladder (distance test)</option></select></label>
+    <label><span>Size, mm<small>diameter / side / length</small></span><input type="number" id="size" value="80" step="5"></label>
+    <label><span>Centre u, mm<small>right of panel centre</small></span><input type="number" id="u" value="0" step="10"></label>
+    <label><span>Centre v, mm<small>away from the arm</small></span><input type="number" id="v" value="-40" step="10"></label>
+    <label><span>Standoff, mm<small>nozzle to panel</small></span><input type="number" id="standoff" value="40" step="5"></label>
+    <input type="range" id="standoffRange" min="10" max="120" step="1" value="40" aria-label="Standoff slider">
+    <label><span>Speed, mm/s</span><input type="number" id="speed" value="40" step="5"></label>
+    <h2 style="margin-top:12px">Setup (assumptions)</h2>
+    <label><span>Panel tilt, deg<small>0 = flat on the table</small></span><input type="number" id="tilt" value="0" step="5"></label>
+    <label><span>Panel centre x, mm<small>from the arm base</small></span><input type="number" id="canvas_x" value="230" step="10"></label>
+    <label><span>Nozzle depth, mm<small>past wrist-roll joint</small></span><input type="number" id="nozzle_depth" value="98" step="2"></label>
+    <label><span>Spot / standoff<small>uncalibrated</small></span><input type="number" id="spray_ratio" value="0.25" step="0.05"></label>
+    <label><span>Spray gate min, mm<small>plan: 30</small></span><input type="number" id="gate_min" value="30" step="5"></label>
+    <label><span>ToF noise, mm<small>1 sigma</small></span><input type="number" id="tof_noise" value="0" step="0.5"></label>
+    <div class="row" style="margin-top:10px">
+      <button class="primary" id="runBtn">Run</button>
+      <button id="reachBtn">Reach map</button>
+      <label style="display:flex;gap:4px;margin:0"><input type="checkbox" id="showReach" checked> show</label>
+    </div>
+    <div id="status" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card">
+    <h2>Arm and panel (drag to orbit, scroll to zoom)</h2>
+    <canvas id="view3d"></canvas>
+    <div class="legend"><span><i class="sw" style="background:#4b5563"></i>SO-101 links (URDF)</span><span><i class="sw" style="background:var(--head)"></i>airbrush head (assumed length)</span><span><i class="sw" style="background:var(--paint)"></i>idealised paint</span><span><i class="sw" style="background:var(--bad)"></i>spray blocked by gate</span></div>
+  </section>
+
+  <section class="card">
+    <h2>Panel, seen from above the arm</h2>
+    <canvas id="view2d"></canvas>
+    <div class="legend"><span><i class="sw" style="background:rgba(46,158,72,.35)"></i>reachable square-on</span><span><i class="sw" style="background:rgba(201,138,18,.35)"></i>close (within 3 mm, 10 deg)</span><span><i class="sw" style="background:#999"></i>planned path</span><span><i class="sw" style="background:var(--paint)"></i>paint (idealised spot)</span></div>
+  </section>
+
+  <section class="card">
+    <h2>Playback</h2>
+    <div class="row"><button id="playBtn">Play</button>
+      <select id="rate" style="width:auto"><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select>
+      <span id="tlabel" class="mono"></span></div>
+    <input type="range" id="scrub" min="0" max="0" value="0" style="margin:8px 0" aria-label="Timeline">
+    <table id="readout" class="mono"></table>
+  </section>
+
+  <section class="card span2">
+    <h2>Standoff over time</h2>
+    <canvas id="chart"></canvas>
+    <div class="legend"><span><i class="sw" style="background:#999"></i>commanded</span><span><i class="sw" style="background:var(--paint)"></i>actual (from the solved pose)</span><span><i class="sw" style="background:var(--ok)"></i>simulated ToF</span><span><i class="sw" style="background:rgba(46,158,72,.15)"></i>spray gate band</span><span><i class="sw" style="background:rgba(36,86,201,.12)"></i>plan's 20-80 mm painting range</span></div>
+  </section>
+
+  <section class="card">
+    <h2>Checks</h2>
+    <div id="warnings"></div>
+    <table id="summary" class="mono" style="margin-top:8px"></table>
+  </section>
+
+  <section class="card span2">
+    <h2>What this run assumes</h2>
+    <table id="assumptions"></table>
+  </section>
+</div>
+
+<script>
+(() => {
+  const STATIC = !!window.SIM_DATA;
+  const $ = (id) => document.getElementById(id);
+  const PARAMS = ["shape", "size", "u", "v", "standoff", "speed", "tilt", "canvas_x", "nozzle_depth", "spray_ratio", "gate_min", "tof_noise"];
+  const REACH_PARAMS = ["standoff", "tilt", "canvas_x", "nozzle_depth"];
+  const S = { data: null, reach: null, reachKey: "", idx: 0, playing: false, last: 0, acc: 0,
+              cam: { yaw: -2.45, pitch: 0.55, dist: 0.85, target: [0.17, 0, 0.08] } };
+
+  // ---------- vector helpers ----------
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+  const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const norm = (a) => mul(a, 1 / Math.hypot(a[0], a[1], a[2]));
+  const fmt = (x, d = 1) => (x === null || x === undefined) ? "n/a" : Number(x).toFixed(d);
+
+  function fitCanvas(c) {
+    const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    if (c.width !== Math.round(r.width * dpr) || c.height !== Math.round(r.height * dpr)) {
+      c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+    }
+    const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return [g, r.width, r.height];
+  }
+
+  // ---------- canvas geometry ----------
+  function panel() {
+    const c = S.data.canvas, k = c.corners;
+    const center = mul(add(add(k[0], k[1]), add(k[2], k[3])), 0.25);
+    return { center, U: c.u, V: c.v, N: c.n, w: c.width_mm, h: c.height_mm,
+      world: (u, v, s = 0) => add(add(add(center, mul(c.u, u / 1000)), mul(c.v, v / 1000)), mul(c.n, s / 1000)),
+      local: (p) => { const d = sub(p, center); return [dot(d, c.u) * 1000, dot(d, c.v) * 1000]; } };
+  }
+
+  // ---------- 3D view ----------
+  function camera(W, H) {
+    const c = S.cam, cp = Math.cos(c.pitch);
+    const eye = add(c.target, [c.dist * cp * Math.cos(c.yaw), c.dist * cp * Math.sin(c.yaw), c.dist * Math.sin(c.pitch)]);
+    const fwd = norm(sub(c.target, eye)), right = norm(cross(fwd, [0, 0, 1])), up = cross(right, fwd);
+    const f = Math.min(W, H) * 1.25;
+    return (p) => { const d = sub(p, eye), z = dot(d, fwd); if (z < 0.02) return null;
+      return [W / 2 + f * dot(d, right) / z, H / 2 - f * dot(d, up) / z, z, f]; };
+  }
+
+  function line3(g, P, a, b) { const A = P(a), B = P(b); if (!A || !B) return; g.beginPath(); g.moveTo(A[0], A[1]); g.lineTo(B[0], B[1]); g.stroke(); }
+
+  function draw3d() {
+    const [g, W, H] = fitCanvas($("view3d"));
+    g.clearRect(0, 0, W, H);
+    if (!S.data) return;
+    const P = camera(W, H), pn = panel(), smp = S.data.samples, cur = smp[S.idx];
+    // table grid
+    g.strokeStyle = "#e6e6e1"; g.lineWidth = 1;
+    for (let x = -0.15; x <= 0.501; x += 0.05) line3(g, P, [x, -0.35, 0], [x, 0.35, 0]);
+    for (let y = -0.35; y <= 0.351; y += 0.05) line3(g, P, [-0.15, y, 0], [0.5, y, 0]);
+    // base marker (footprint not modelled)
+    g.fillStyle = "#d4d6da"; g.beginPath();
+    for (let i = 0; i <= 24; i++) { const a = i / 24 * 2 * Math.PI, q = P([0.02 + 0.045 * Math.cos(a), 0.045 * Math.sin(a), 0]); if (q) i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }
+    g.fill();
+    // panel
+    const k = S.data.canvas.corners.map(P);
+    if (k.every(Boolean)) { g.fillStyle = "#f3eee4"; g.strokeStyle = "#b8ab93"; g.lineWidth = 1.2; g.beginPath();
+      k.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.closePath(); g.fill(); g.stroke(); }
+    // planned path
+    g.setLineDash([4, 4]); g.strokeStyle = "#9a9a9a"; g.lineWidth = 1;
+    for (const st of S.data.strokes) { g.beginPath(); st.forEach((p, i) => { const q = P(pn.world(p[0], p[1])); if (q) i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.stroke(); }
+    g.setLineDash([]);
+    // paint so far
+    for (let i = 0; i <= S.idx; i++) { const s = smp[i]; if (!s.hit_uv) continue;
+      if (s.painting) { const q = P(pn.world(s.hit_uv[0], s.hit_uv[1])); if (!q) continue; const r = Math.max(1, q[3] * s.spot_mm / 2000 / q[2]);
+        g.fillStyle = "rgba(36,86,201,0.10)"; g.beginPath(); g.arc(q[0], q[1], r, 0, 7); g.fill(); }
+      else if (s.blocked) { const q = P(pn.world(s.hit_uv[0], s.hit_uv[1])); if (!q) continue; g.fillStyle = "rgba(201,55,44,.7)"; g.fillRect(q[0] - 1, q[1] - 1, 2, 2); } }
+    // spray cone / standoff ray
+    if (cur.hit_uv) {
+      const hit = pn.world(cur.hit_uv[0], cur.hit_uv[1]);
+      if (cur.air && cur.needle > 0) {
+        const r = (cur.spot_mm || 0) / 2;
+        g.strokeStyle = cur.painting ? "rgba(36,86,201,.55)" : "rgba(201,55,44,.8)"; g.lineWidth = 1;
+        for (let a = 0; a < 4; a++) { const ang = a * Math.PI / 2; line3(g, P, cur.tip, pn.world(cur.hit_uv[0] + r * Math.cos(ang), cur.hit_uv[1] + r * Math.sin(ang))); }
+      } else { g.setLineDash([3, 3]); g.strokeStyle = "rgba(46,158,72,.8)"; line3(g, P, cur.tip, hit); g.setLineDash([]); }
+    }
+    // arm
+    const sk = cur.skeleton;
+    for (let i = 0; i < sk.length - 1; i++) {
+      g.strokeStyle = i === sk.length - 2 ? getComputedStyle(document.body).getPropertyValue("--head") : "#4b5563";
+      g.lineWidth = i === sk.length - 2 ? 5 : 7; g.lineCap = "round"; line3(g, P, sk[i], sk[i + 1]);
+    }
+    for (let i = 1; i < sk.length - 1; i++) { const q = P(sk[i]); if (!q) continue; g.fillStyle = "#fff"; g.strokeStyle = "#1d1f21"; g.lineWidth = 1.5; g.beginPath(); g.arc(q[0], q[1], 3.5, 0, 7); g.fill(); g.stroke(); }
+    g.fillStyle = "#6b6f76"; g.font = "12px system-ui";
+    g.fillText(`t = ${fmt(cur.t, 2)} s   ${cur.phase}${cur.reached ? "" : "   (target not reached)"}`, 10, 18);
+  }
+
+  // ---------- 2D panel view ----------
+  function draw2d() {
+    const [g, W, H] = fitCanvas($("view2d"));
+    g.clearRect(0, 0, W, H);
+    if (!S.data) return;
+    const pn = panel(), m = 14, bottom = 34;
+    const k = Math.min((W - 2 * m) / pn.w, (H - m - bottom) / pn.h);
+    const ox = (W - pn.w * k) / 2, oy = m;
+    const X = (u) => ox + (u + pn.w / 2) * k, Y = (v) => oy + (pn.h / 2 - v) * k;
+    g.fillStyle = "#f3eee4"; g.fillRect(X(-pn.w / 2), Y(pn.h / 2), pn.w * k, pn.h * k);
+    // reach map
+    if (S.reach && $("showReach").checked) {
+      const r = S.reach, cell = r.step_mm * k;
+      r.status.forEach((row, j) => row.forEach((st, i) => { if (!st) return;
+        g.fillStyle = st === 2 ? "rgba(46,158,72,.28)" : "rgba(201,138,18,.28)";
+        const x0 = Math.max(X(r.u_mm[i]) - cell / 2, X(-pn.w / 2)), x1 = Math.min(X(r.u_mm[i]) + cell / 2, X(pn.w / 2));
+        const y0 = Math.max(Y(r.v_mm[j]) - cell / 2, Y(pn.h / 2)), y1 = Math.min(Y(r.v_mm[j]) + cell / 2, Y(-pn.h / 2));
+        g.fillRect(x0, y0, x1 - x0, y1 - y0); }));
+    }
+    g.strokeStyle = "#b8ab93"; g.lineWidth = 1; g.strokeRect(X(-pn.w / 2), Y(pn.h / 2), pn.w * k, pn.h * k);
+    // grid every 50 mm
+    g.strokeStyle = "rgba(0,0,0,.05)";
+    for (let u = -200; u <= 200; u += 50) { g.beginPath(); g.moveTo(X(u), Y(pn.h / 2)); g.lineTo(X(u), Y(-pn.h / 2)); g.stroke(); }
+    for (let v = -150; v <= 150; v += 50) { if (Math.abs(v) > pn.h / 2) continue; g.beginPath(); g.moveTo(X(-pn.w / 2), Y(v)); g.lineTo(X(pn.w / 2), Y(v)); g.stroke(); }
+    // planned path
+    g.setLineDash([4, 4]); g.strokeStyle = "#8d8d8d";
+    for (const st of S.data.strokes) { g.beginPath(); st.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.stroke(); }
+    g.setLineDash([]);
+    // paint
+    const smp = S.data.samples;
+    for (let i = 0; i <= S.idx; i++) { const s = smp[i]; if (!s.hit_uv) continue;
+      if (s.painting) { g.fillStyle = "rgba(36,86,201,0.07)"; g.beginPath(); g.arc(X(s.hit_uv[0]), Y(s.hit_uv[1]), Math.max(0.8, s.spot_mm / 2 * k), 0, 7); g.fill(); }
+      else if (s.blocked) { g.fillStyle = "rgba(201,55,44,.8)"; g.fillRect(X(s.hit_uv[0]) - 1.5, Y(s.hit_uv[1]) - 1.5, 3, 3); } }
+    // nozzle position now
+    const cur = smp[S.idx];
+    if (cur.hit_uv) { const x = X(cur.hit_uv[0]), y = Y(cur.hit_uv[1]);
+      g.strokeStyle = cur.reached ? "#1d1f21" : "#c9372c"; g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(x - 7, y); g.lineTo(x + 7, y); g.moveTo(x, y - 7); g.lineTo(x, y + 7); g.stroke();
+      g.beginPath(); g.arc(x, y, Math.max(2, (cur.spot_mm || 0) / 2 * k), 0, 7); g.stroke(); }
+    // where the arm is
+    const b = pn.local([0, 0, 0]);
+    g.fillStyle = "#6b6f76"; g.font = "12px system-ui"; g.textAlign = "center";
+    const bx = Math.min(Math.max(X(b[0]), 30), W - 30);
+    g.fillText("arm base " + (Y(b[1]) > H - 8 ? `(${fmt(-pn.h / 2 - b[1], 0)} mm below the edge)` : ""), bx, H - 10);
+    g.textAlign = "left"; g.fillText("50 mm grid", X(-pn.w / 2) + 4, Y(pn.h / 2) + 14);
+  }
+
+  // ---------- chart ----------
+  function drawChart() {
+    const [g, W, H] = fitCanvas($("chart"));
+    g.clearRect(0, 0, W, H);
+    if (!S.data) return;
+    const smp = S.data.samples, cfg = S.data.config, T = smp[smp.length - 1].t || 1;
+    const vals = smp.flatMap(s => [s.target_uvs[2], s.standoff_actual_mm, s.tof_mm]).filter(v => v !== null);
+    const ymax = Math.max(100, Math.ceil(Math.max(...vals) / 20) * 20 + 10), ymin = 0;
+    const L = 38, R = 8, Tp = 8, B = 20;
+    const X = (t) => L + (W - L - R) * t / T, Y = (v) => Tp + (H - Tp - B) * (1 - (v - ymin) / (ymax - ymin));
+    const band = (a, b, col) => { const y0 = Y(Math.min(b, ymax)), y1 = Y(Math.max(a, ymin)); if (y1 > y0) { g.fillStyle = col; g.fillRect(L, y0, W - L - R, y1 - y0); } };
+    band(cfg.gate_min_mm, cfg.gate_max_mm, "rgba(46,158,72,.12)");
+    band(cfg.paint_range_min_mm, cfg.paint_range_max_mm, "rgba(36,86,201,.10)");
+    g.strokeStyle = "#ddd"; g.fillStyle = "#6b6f76"; g.font = "11px system-ui";
+    for (let v = 0; v <= ymax; v += 20) { g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(W - R, Y(v)); g.stroke(); g.fillText(v + "", 6, Y(v) + 4); }
+    g.fillText("mm", 6, Tp + 2); g.fillText(fmt(T, 1) + " s", W - R - 30, H - 4);
+    // spraying spans
+    smp.forEach((s, i) => { if (s.air && s.needle > 0) { g.fillStyle = s.blocked ? "rgba(201,55,44,.25)" : "rgba(36,86,201,.18)"; g.fillRect(X(s.t), H - B + 2, Math.max(1, X(s.t + cfg.dt_s) - X(s.t)), 5); } });
+    const plot = (key, col, w, dash) => { g.strokeStyle = col; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false;
+      smp.forEach(s => { const v = key(s); if (v === null) { pen = false; return; } pen ? g.lineTo(X(s.t), Y(v)) : g.moveTo(X(s.t), Y(v)); pen = true; }); g.stroke(); g.setLineDash([]); };
+    plot(s => s.target_uvs[2], "#999", 1.5, [5, 3]);
+    plot(s => s.standoff_actual_mm, "#2456c9", 1.5);
+    plot(s => s.tof_mm, "rgba(46,158,72,.9)", 1);
+    const cx = X(smp[S.idx].t); g.strokeStyle = "#1d1f21"; g.beginPath(); g.moveTo(cx, Tp); g.lineTo(cx, H - B); g.stroke();
+  }
+
+  // ---------- text panels ----------
+  function readout() {
+    const s = S.data.samples[S.idx], deg = (r) => fmt(r * 180 / Math.PI, 1);
+    const rows = [["Phase", s.phase], ["Air / needle", `${s.air ? "on" : "off"} / ${fmt(s.needle, 2)}`],
+      ["Commanded standoff", fmt(s.target_uvs[2]) + " mm"], ["Actual standoff", fmt(s.standoff_actual_mm) + " mm"],
+      ["Simulated ToF", fmt(s.tof_mm) + " mm"], ["Spray gate", s.gate_ok ? "open" : "closed"],
+      ["Pose error", `${fmt(s.pos_error_mm, 2)} mm, ${fmt(s.angle_error_deg, 2)} deg`]];
+    S.data.joints.forEach((j, i) => rows.push([j.name + " (URDF)", deg(s.q[i]) + " deg"]));
+    $("readout").innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+    $("tlabel").textContent = `${fmt(s.t, 2)} / ${fmt(S.data.samples[S.data.samples.length - 1].t, 2)} s`;
+    $("scrub").value = S.idx;
+  }
+
+  function panels() {
+    const d = S.data, s = d.summary;
+    $("warnings").innerHTML = d.warnings.length ? d.warnings.map(w => `<div>${esc(w)}</div>`).join("")
+      : `<div class="good">The arm reaches the whole path square to the panel and the spray gate stays open. (Kinematics only.)</div>`;
+    const rows = [["Duration", s.duration_s + " s"], ["Stroke samples", s.stroke_samples], ["Unreached", s.unreached_stroke_samples],
+      ["Spray blocked by gate", s.blocked_spray_samples], ["Worst miss", `${s.max_pos_error_mm} mm / ${s.max_angle_error_deg} deg`],
+      ["Actual standoff", `${s.standoff_actual_min_mm} to ${s.standoff_actual_max_mm} mm`]];
+    for (const [k, v] of Object.entries(s.max_joint_speed_rad_s)) rows.push([`${k} max speed`, `${v} rad/s, margin ${s.min_joint_margin_deg[k]} deg`]);
+    $("summary").innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+    $("assumptions").innerHTML = "<tr><th>Item</th><th>Basis</th><th></th></tr>" + d.assumptions.map(a =>
+      `<tr><td>${esc(a.item)}</td><td>${esc(a.basis)}</td><td><span class="tag ${a.kind.split(" ")[0]}">${esc(a.kind)}</span></td></tr>`).join("");
+    $("scrub").max = d.samples.length - 1;
+  }
+  const esc = (t) => String(t).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+
+  function render() { if (!S.data) return; draw3d(); draw2d(); drawChart(); readout(); }
+
+  // ---------- server calls ----------
+  const qs = (keys) => keys.map(k => `${k}=${encodeURIComponent($(k).value)}`).join("&");
+  async function run() {
+    $("status").textContent = "Simulating...";
+    try {
+      const r = await fetch("/api/simulate?" + qs(PARAMS)); const j = await r.json();
+      if (!r.ok) throw new Error(j.error || r.status);
+      S.data = j; S.idx = 0; panels(); render(); $("status").textContent = `Done: ${j.samples.length} samples.`;
+      if (qs(REACH_PARAMS) !== S.reachKey) reach();
+    } catch (e) { $("status").textContent = "Error: " + e.message; }
+  }
+  async function reach() {
+    const key = qs(REACH_PARAMS); S.reachKey = key; $("reachBtn").disabled = true;
+    $("status").textContent = "Computing reach map (a few seconds)...";
+    try { const r = await fetch("/api/reach?" + key); const j = await r.json(); if (!r.ok) throw new Error(j.error);
+      if (key === S.reachKey) { S.reach = j; render(); const c = j.status.flat(); $("status").textContent = `Reach map: ${Math.round(100 * c.filter(x => x === 2).length / c.length)}% of the panel reachable square-on at ${j.standoff_mm} mm.`; } }
+    catch (e) { $("status").textContent = "Reach map error: " + e.message; }
+    $("reachBtn").disabled = false;
+  }
+
+  // ---------- playback ----------
+  function tick(ts) {
+    if (!S.playing) return;
+    const dt = S.data.config.dt_s, rate = parseFloat($("rate").value);
+    S.acc += (ts - (S.last || ts)) / 1000 * rate; S.last = ts;
+    const steps = Math.floor(S.acc / dt); S.acc -= steps * dt;
+    if (steps) { S.idx = Math.min(S.idx + steps, S.data.samples.length - 1); render(); }
+    if (S.idx >= S.data.samples.length - 1) { S.playing = false; $("playBtn").textContent = "Play"; return; }
+    requestAnimationFrame(tick);
+  }
+  $("playBtn").onclick = () => { if (!S.data) return; S.playing = !S.playing; $("playBtn").textContent = S.playing ? "Pause" : "Play";
+    if (S.playing) { if (S.idx >= S.data.samples.length - 1) S.idx = 0; S.last = 0; S.acc = 0; requestAnimationFrame(tick); } };
+  $("scrub").oninput = (e) => { S.idx = +e.target.value; render(); };
+  $("showReach").onchange = render;
+
+  // ---------- orbit ----------
+  const v3 = $("view3d"); let drag = null;
+  v3.addEventListener("pointerdown", e => { drag = [e.clientX, e.clientY]; v3.setPointerCapture(e.pointerId); v3.style.cursor = "grabbing"; });
+  v3.addEventListener("pointermove", e => { if (!drag) return; S.cam.yaw -= (e.clientX - drag[0]) * 0.008;
+    S.cam.pitch = Math.min(1.5, Math.max(-0.2, S.cam.pitch + (e.clientY - drag[1]) * 0.008)); drag = [e.clientX, e.clientY]; draw3d(); });
+  v3.addEventListener("pointerup", () => { drag = null; v3.style.cursor = "grab"; });
+  v3.addEventListener("wheel", e => { e.preventDefault(); S.cam.dist = Math.min(3, Math.max(0.3, S.cam.dist * (e.deltaY > 0 ? 1.1 : 0.9))); draw3d(); }, { passive: false });
+  v3.addEventListener("dblclick", () => { S.cam = { yaw: -2.45, pitch: 0.55, dist: 0.85, target: [0.17, 0, 0.08] }; draw3d(); });
+  window.addEventListener("resize", render);
+
+  // ---------- wiring ----------
+  $("standoffRange").oninput = (e) => { $("standoff").value = e.target.value; };
+  $("standoff").oninput = (e) => { $("standoffRange").value = e.target.value; };
+  if (STATIC) {
+    S.data = window.SIM_DATA.result; S.reach = window.SIM_DATA.reach;
+    const c = S.data.config;
+    const set = { shape: c.shape.kind, size: c.shape.size_mm, u: c.shape.center_mm[0], v: c.shape.center_mm[1], standoff: c.standoff_mm,
+      speed: c.speed_mm_s, tilt: c.canvas.tilt_deg, canvas_x: c.canvas.center_m[0] * 1000, nozzle_depth: c.tool.depth * 1000,
+      spray_ratio: c.spray_width_ratio, gate_min: c.gate_min_mm, tof_noise: c.tof_noise_mm };
+    for (const [k, v] of Object.entries(set)) { $(k).value = v; $(k).disabled = true; }
+    $("standoffRange").value = c.standoff_mm; $("standoffRange").disabled = true;
+    $("runBtn").disabled = true; $("reachBtn").disabled = true; $("staticNote").style.display = "block";
+    panels(); render();
+  } else {
+    $("runBtn").onclick = run; $("reachBtn").onclick = reach;
+    let timer = null;
+    PARAMS.forEach(k => $(k).addEventListener("change", () => { clearTimeout(timer); timer = setTimeout(run, 250); }));
+    $("standoffRange").addEventListener("change", () => { clearTimeout(timer); timer = setTimeout(run, 250); });
+    run();
+  }
+})();
+</script>
+</body>
+</html>
