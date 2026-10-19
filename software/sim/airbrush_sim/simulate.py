@@ -1,5 +1,9 @@
 """Turn a shape into a timed, sampled arm trajectory and check it.
 
+Input: a SimConfig.
+Output: the result dict (config, assumptions, joints, canvas, strokes, samples, summary, warnings) and reach maps.
+Must never: draw paint where the spray gate blocks it, or change the result keys without bumping ``version``.
+
 For each sample the simulator solves IK for the commanded nozzle pose, then
 works out everything from the *achieved* pose (forward kinematics): where the
 spray axis actually hits the panel, the true standoff, the simulated ToF

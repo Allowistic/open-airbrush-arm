@@ -1,3 +1,7 @@
+# Input: simulate, build_timeline and reach_map with test configs.
+# Output: unittest results for standoff, spray gate, warnings and reach.
+# Must never: loosen a check or tolerance just to make a change pass.
+
 import math
 import unittest
 

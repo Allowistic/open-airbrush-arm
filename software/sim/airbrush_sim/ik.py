@@ -1,5 +1,9 @@
 """Numerical inverse kinematics for the nozzle (position + spray direction).
 
+Input: a target nozzle position and spray direction in base_link, an optional warm-start seed.
+Output: an IKResult with joint angles clamped to the URDF limits and the leftover position and angle error.
+Must never: return joint angles outside the URDF limits, or hide the leftover error.
+
 Damped least squares on the five arm joints with a finite-difference Jacobian.
 The task has 5 independent constraints (3 for position, 2 for the direction of
 the round spray cone; roll about the nozzle axis is free), which matches the

@@ -1,3 +1,7 @@
+# Input: paths.build and the shape generators.
+# Output: unittest results for shape geometry.
+# Must never: loosen a check or tolerance just to make a change pass.
+
 import math
 import unittest
 
