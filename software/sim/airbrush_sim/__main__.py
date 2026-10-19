@@ -1,4 +1,9 @@
-"""Command line: ``python3 -m airbrush_sim {serve,run}``."""
+"""Command line: ``python3 -m airbrush_sim {serve,run}``.
+
+Input: command-line arguments.
+Output: printed checks, optional JSON, CSV and HTML files, and the exit code.
+Must never: exit 0 under --check when a stroke point is unreached or spray is blocked.
+"""
 
 from __future__ import annotations
 

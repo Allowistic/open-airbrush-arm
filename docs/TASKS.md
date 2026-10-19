@@ -52,8 +52,8 @@ Status key: **open**, **blocked** (waiting on a measurement or decision), **in p
 - **Done when:** the comparison table exists and the default behaviour is unchanged.
 
 ### T8. Run the tests in CI
-- **Status:** open
-- **Do:** add `.github/workflows/sim-tests.yml` running `git submodule update --init` and `python3 -m unittest discover -s tests` in `software/sim` on Python 3.9 and 3.12. Pushing a workflow file needs a token with the `workflow` permission.
+- **Status:** in progress (`process/blast-radius-gate`)
+- **Do:** add `.github/workflows/sim-tests.yml` running `git submodule update --init` and `python3 -m unittest discover -s tests` in `software/sim` on Python 3.9 and 3.12. Pushing a workflow file needs a token with the `workflow` permission. (The workflow runs `tools/verify.sh`, which does both plus a headless `--check` run and the contract check.)
 - **Done when:** the workflow runs green on a PR.
 
 ## Toward the real arm

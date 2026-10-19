@@ -1,0 +1,153 @@
+# Blast Radius Protocol — Advisory PR Check
+#
+# Runs blast-check.sh on every pull request and posts findings as a PR comment.
+# Advisory only — does not block merge. Set BLAST_STRICT: "1" to make it blocking.
+#
+# Security: the check script is always loaded from the BASE branch (the merge target),
+# never from the PR branch. This prevents malicious PRs from tampering with the checker.
+# The PR's source files are then checked out on top for analysis.
+#
+# Setup: copy this file and tools/blast-check.sh into your repo.
+# No dependencies. No framework. Just a shell script and a workflow.
+
+name: Blast Radius Check
+
+on:
+  pull_request:
+    paths:
+      - '**.ts'
+      - '**.tsx'
+      - '**.js'
+      - '**.jsx'
+      - '**.py'
+      - '**.sh'
+      - '**.desc'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  blast-check:
+    name: Advisory Protocol Check
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout the BASE branch to get the trusted blast-check.sh
+      - name: Checkout base branch (trusted checker)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+
+      # 2. Copy the trusted checker to a safe location outside the working tree
+      - name: Preserve trusted blast-check.sh
+        run: |
+          if [[ -f tools/blast-check.sh ]]; then
+            cp tools/blast-check.sh /tmp/blast-check-trusted.sh
+            chmod +x /tmp/blast-check-trusted.sh
+            echo "CHECKER_FOUND=true" >> "$GITHUB_ENV"
+          else
+            echo "CHECKER_FOUND=false" >> "$GITHUB_ENV"
+          fi
+
+      # 3. Now checkout the PR branch for analysis
+      - name: Checkout PR branch (files to analyze)
+        if: env.CHECKER_FOUND == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 4. Run the TRUSTED checker against the PR's files
+      - name: Run blast-check.sh (from base branch)
+        if: env.CHECKER_FOUND == 'true'
+        id: check
+        env:
+          # Set to "1" to fail the job when findings exist (blocking mode)
+          BLAST_STRICT: "0"
+        run: |
+          # Run the trusted (base branch) copy of blast-check.sh against PR files
+          # Strip ANSI color codes for the PR comment
+          OUTPUT=$(bash /tmp/blast-check-trusted.sh --changed 2>&1 | sed 's/\x1b\[[0-9;]*m//g') || true
+          
+          # Write output to file to avoid template literal injection issues
+          echo "$OUTPUT" > /tmp/blast-check-output.txt
+          
+          # Count findings for the summary line
+          FINDING_COUNT=$(echo "$OUTPUT" | grep -c "⚠" || true)
+          echo "findings=$FINDING_COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Post PR Comment
+        if: env.CHECKER_FOUND == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('/tmp/blast-check-output.txt', 'utf8');
+            const findings = parseInt('${{ steps.check.outputs.findings }}') || 0;
+            const marker = '<!-- blast-radius-check -->';
+
+            let body;
+            if (findings === 0) {
+              body = [
+                marker,
+                '### ✅ Blast Radius Check — Clean',
+                '',
+                'No contract, orphan, assembly, or .desc findings on changed files.',
+                '',
+                '<details>',
+                '<summary>Full output</summary>',
+                '',
+                '```',
+                output,
+                '```',
+                '',
+                '</details>',
+                '',
+                '*Advisory only — [Blast Radius Protocol](https://github.com/rkz211/blast-radius)*'
+              ].join('\n');
+            } else {
+              body = [
+                marker,
+                `### ⚠️ Blast Radius Check — ${findings} Finding(s)`,
+                '',
+                'These are **advisory** — they flag mechanical issues (missing contracts, orphaned versions, assembly logic, .desc gaps). They do not check whether contracts are *accurate*; only whether they *exist*.',
+                '',
+                '```',
+                output,
+                '```',
+                '',
+                '**What to do:**',
+                '- Missing contracts → add `// Input: / Output: / Must never:` to the top of the file',
+                '- Orphaned versions → delete dead `.v1`/`.v2` files or wire them back in',
+                '- Assembly logic → move conditional logic out of wiring files into blocks',
+                '- Missing `.desc` → add orientation file if using the Hologram Pyramid',
+                '',
+                '*Advisory only — [Blast Radius Protocol](https://github.com/rkz211/blast-radius)*'
+              ].join('\n');
+            }
+
+            // Find and update existing comment, or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

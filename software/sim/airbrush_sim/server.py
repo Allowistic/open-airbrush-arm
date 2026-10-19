@@ -1,5 +1,9 @@
 """Local web viewer: a stdlib HTTP server plus a static HTML export.
 
+Input: query parameters from web/index.html; a result dict (and reach map) for export.
+Output: JSON simulation and reach responses, the viewer page, self-contained HTML files.
+Must never: do kinematics itself instead of calling simulate, or listen beyond 127.0.0.1 by default.
+
 The browser page (web/index.html) draws the arm, the panel and the paint; all
 the maths runs here in Python, so the viewer and the tests use the same code.
 """

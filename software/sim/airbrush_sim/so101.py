@@ -1,5 +1,9 @@
 """SO-101 follower kinematics, taken from the upstream URDF.
 
+Input: joint angles (URDF radians) and a NozzleTool offset; the upstream URDF file for the cross-check.
+Output: link frames, nozzle position and spray direction, joint-limit checks, parsed URDF joints.
+Must never: change the embedded URDF numbers without the URDF cross-check test passing, or treat angles as calibrated LeRobot motor units.
+
 The joint origins, axes and limits below are the numbers in
 ``third_party/SO-ARM100/Simulation/SO101/so101_new_calib.urdf`` at submodule
 commit a758567 (TheRobotStudio, Apache-2.0). They are embedded as data so the

@@ -1,5 +1,9 @@
 """Simulation settings. Every number here is either from the repo or an assumption.
 
+Input: viewer or CLI parameters as strings.
+Output: a validated SimConfig (with Canvas, Shape and NozzleTool) and the ASSUMPTIONS table.
+Must never: add or change a number without a matching ASSUMPTIONS row that says whether it is a source or an assumption.
+
 ``ASSUMPTIONS`` lists each setting with where it came from, so the viewer and
 the exported JSON can show it next to the results.
 """

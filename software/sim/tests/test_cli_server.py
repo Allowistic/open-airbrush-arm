@@ -1,3 +1,7 @@
+# Input: the airbrush_sim CLI (run in a subprocess) and the local viewer server.
+# Output: unittest results for exports, --check exit codes and HTTP responses.
+# Must never: loosen a check or tolerance just to make a change pass.
+
 import json
 import subprocess
 import sys

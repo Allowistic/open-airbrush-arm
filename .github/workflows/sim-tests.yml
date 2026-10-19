@@ -1,0 +1,39 @@
+# Input:  pushes to main and every pull request
+# Output: a pass/fail status for the simulator gate (tools/verify.sh) on Python 3.9 and 3.12
+# Must never: run with the SO-ARM100 submodule missing, or be described as hardware validation
+#
+# Unlike blast-check.yml (advisory, comments only), this job fails when the gate fails.
+# To stop a red PR from merging, also mark "verify (3.9)" and "verify (3.12)" as required
+# checks in the repo's branch protection settings for main.
+
+name: Simulator gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify (${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Run tools/verify.sh
+        env:
+          PYTHON: python
+        run: bash tools/verify.sh

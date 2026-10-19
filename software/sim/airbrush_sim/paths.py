@@ -1,5 +1,9 @@
 """Scripted shape paths in canvas coordinates.
 
+Input: a Shape and a standoff in mm.
+Output: strokes, each a list of (u_mm, v_mm, standoff_mm) waypoints.
+Must never: depend on arm kinematics or randomness; the same settings always give the same path.
+
 A path is a list of strokes. Each stroke is a list of (u_mm, v_mm, standoff_mm)
 waypoints sprayed in order; the simulator inserts the travel moves (spray off)
 between strokes. Shapes are deterministic: same settings, same path.

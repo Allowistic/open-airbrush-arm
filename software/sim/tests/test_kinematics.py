@@ -1,3 +1,7 @@
+# Input: so101 and ik, plus the upstream URDF when the submodule is checked out.
+# Output: unittest results for forward kinematics, IK and the URDF cross-check.
+# Must never: loosen a check or tolerance just to make a change pass.
+
 import math
 import random
 import unittest

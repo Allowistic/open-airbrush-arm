@@ -1,0 +1,8 @@
+# tools
+
+- `verify.sh`: the verification gate for the simulator. Run `bash tools/verify.sh` from anywhere in the repo; set `PYTHON` to use another interpreter. It fails if the upstream URDF is missing, if any unit test fails or is skipped, if the default headless run fails `--check`, or if a Python file under `software/sim` is missing its `Input:` / `Output:` / `Must never:` contract. CI runs it through `.github/workflows/sim-tests.yml`. It checks the simulation only, never hardware.
+- `blast-check.sh`: the advisory checker from the Blast Radius Protocol. It reports missing contracts, leftover `.v1`/`.v2` files, logic in wiring files and `.desc` gaps, and changes nothing. Run `bash tools/blast-check.sh [dir]`, add `--changed` for files with uncommitted changes only, or set `BLAST_STRICT=1` to exit 1 on findings. `.github/workflows/blast-check.yml` runs it on pull requests and posts the result as a comment without blocking. See `docs/LESSONS.md` for two limits of that workflow.
+
+## Where blast-check came from
+
+`tools/blast-check.sh` and `.github/workflows/blast-check.yml` are unmodified copies from [rkz211/blast-radius](https://github.com/rkz211/blast-radius) at commit `d78670af42b8683f2e6d12bec9a79087b7ee1662` (2 July 2026), by rkz211. That repo has no license file, so these two files are **not** covered by this repo's Apache-2.0 license; their author keeps the rights. They were added at the owner's request. Confirm permission with the author before relying on them long term. If they have to come out, step 4 of `verify.sh` calls `blast-check.sh` and needs its own contract check in its place; the rest of `verify.sh` and `sim-tests.yml` do not depend on them.

@@ -23,13 +23,16 @@ No part of this has been tested on hardware. Nobody has measured the head, the n
 git clone https://github.com/Allowistic/open-airbrush-arm.git
 cd open-airbrush-arm
 git submodule update --init            # needed for the URDF cross-check test
+bash tools/verify.sh                   # the gate: URDF present, all tests, headless --check, contracts
 cd software/sim
 python3 -m unittest discover -s tests -v    # ~15 s, all should pass
 python3 -m airbrush_sim run --shape circle  # quick headless check
 python3 -m airbrush_sim serve               # browser viewer at http://127.0.0.1:8765
 ```
 
-Python 3.9+, standard library only. There is no CI yet (task T8), so run the tests yourself before you push and paste the result in the PR.
+Python 3.9+, standard library only. `tools/verify.sh` is the verification gate; run it before you push and paste its last lines in the PR. CI runs the same script on Python 3.9 and 3.12 (`.github/workflows/sim-tests.yml`) and fails the check when it fails. `tools/blast-check.sh` with `.github/workflows/blast-check.yml` also posts an advisory comment on PRs (see `tools/README.md`).
+
+The viewer (`web/index.html`) has no automated test beyond the server test fetching the page and the API. If you change it, open it with `serve`, try the settings you touched, and say in the PR what you looked at.
 
 ## Rules
 
@@ -45,6 +48,29 @@ Python 3.9+, standard library only. There is no CI yet (task T8), so run the tes
 6. **Safety-relevant changes** (air pressure, valve, motion or speed limits, spray gate, watchdog) must be called out in the PR description.
 7. **Small PRs on a branch**, one task per PR, with how you tested. Name branches `<area>/<short-name>`, e.g. `sim/nozzle-frame`.
 8. **Out of scope for now:** colour switching and purging, ML policy training, mural or car-panel scale. They are later goals; do not build them until a task here says so.
+
+## Change discipline (Blast Radius)
+
+This repo follows the ideas of the [Blast Radius Protocol](https://github.com/rkz211/blast-radius) by rkz211, adapted here: each edit should touch one concern, and nothing is done until it has been checked against something real.
+
+- **Contracts.** Every Python file starts with three lines in its docstring or header comment: `Input:`, `Output:` and `Must never:`, inside the first 10 lines. They say what the file consumes, what it produces and what would break its callers. Update them in the same commit as the code; a stale contract is worse than none. `tools/blast-check.sh` checks that they exist, not that they are true, so read them when you review.
+- **One concern per change.** A PR does one task and should change only the files that task owns. Check with `git diff --stat` before you push; anything unexpected in the list means stop and explain it.
+- **Known-good point first.** Before a risky change, note the commit you started from (or `git tag known-good` locally). If a fix makes things worse, go back to it instead of stacking more fixes.
+- **Diagnose before you rewrite.** When something breaks, find the one file that owns the problem, read its contract, and add a print, log or test that proves the cause. Then change only that file.
+- **The gate is `tools/verify.sh`.** Passing it means the simulator agrees with itself and with the upstream URDF. It is not evidence about the real arm, the airbrush, paint, air pressure or safety, and a PR must not say it is.
+- **Lessons go in `docs/LESSONS.md`,** in the same commit as the fix: what went wrong or surprised you, how it was found, and the rule that prevents it. Only things that cost effort to learn and cannot be read from the code. Delete a lesson when it stops being true. Nothing goes in it that did not actually happen.
+- **Wiring stays thin.** `__main__.py` (CLI) and `server.py` (HTTP) parse input and call `simulate`; the maths lives in `so101.py`, `ik.py`, `paths.py` and `simulate.py`. Do not move kinematics or spray logic into the wiring.
+
+### Who may edit, and how carefully
+
+The protocol says to set the rules for the weakest agent that ever edits a repo. Current writers: the owner (Vincent) and his Sesame assistant. Grok Build does not work on this repo. No model version has been confirmed for any agent, so no capability floor is declared, and every agent follows the careful profile:
+
+- small PRs (one concern; split anything that grows past a few hundred changed lines),
+- files kept to one concern (the current modules are all under 300 lines; split a file only along a concern, never to hit a line count),
+- `tools/verify.sh` passing and pasted in the PR,
+- the owner reviews and merges every PR; agents do not merge their own.
+
+If another agent or bot starts working here, add it to this list in its own PR. An agent that is not listed may read the repo but should not push to it.
 
 ## How the simulator fits together
 
